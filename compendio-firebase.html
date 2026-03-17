@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Compendio Escolar</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet">
+
+<!-- ╔══════════════════════════════════════════════════════════════╗
+     ║  🔥 PASO 1: PEGA AQUÍ TU firebaseConfig DE FIREBASE CONSOLE ║
+     ╚══════════════════════════════════════════════════════════════╝ -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getFirestore, collection, addDoc, getDocs, query, where, orderBy, serverTimestamp }
+    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  import { getStorage, ref, uploadBytes, getDownloadURL }
+    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+  import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged }
+    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+  // ▼▼▼ REEMPLAZA ESTE OBJETO CON TU CONFIGURACIÓN DE FIREBASE ▼▼▼
+  const firebaseConfig = {
+    apiKey:            "TU_API_KEY",
+    authDomain:        "TU_PROYECTO.firebaseapp.com",
+    projectId:         "TU_PROYECTO",
+    storageBucket:     "TU_PROYECTO.appspot.com",
+    messagingSenderId: "TU_SENDER_ID",
+    appId:             "TU_APP_ID"
+  };
+  // ▲▲▲ FIN DE CONFIGURACIÓN ▲▲▲
+
+  const app  = initializeApp(firebaseConfig);
+  const db   = getFirestore(app);
+  const storage = getStorage(app);
+  const auth = getAuth(app);
+
+  // ─── Expose to window so non-module scripts can use ───
+  window._fb = { db, storage, auth,
+    collection, addDoc, getDocs, query, where, orderBy, serverTimestamp,
+    ref, uploadBytes, getDownloadURL,
+    signInWithEmailAndPassword, signOut, onAuthStateChanged };
+
+  // ─── Auth state watcher ───
+  onAuthStateChanged(auth, user => {
+    window._adminUser = user;
+    if (window._onAuthChange) window._onAuthChange(user);
+  });
+</script>
+
+<style>
+/* ══════════════════════ DESIGN TOKENS ══════════════════════ */
+:root {
+  --ink:      #111210;
+  --paper:    #f6f3ee;
+  --cream:    #ede9e0;
+  --border:   #ddd9d0;
+  --muted:    #7c786e;
+  --g1:       #1a56b0;
+  --g1-light: #e8f0fb;
+  --g2:       #b03a1a;
+  --g2-light: #fbeee8;
+  --gold:     #c9920a;
+  --success:  #1d7a4e;
+  --danger:   #c0392b;
+  --shadow:   0 2px 16px rgba(17,18,16,.08);
+  --shadow-lg:0 8px 40px rgba(17,18,16,.14);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:'DM Sans',sans-serif;background:var(--paper);color:var(--ink);min-height:100vh;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit;cursor:pointer}
+
+/* ══════════════════════ TOP NAV ══════════════════════ */
+.topnav{
+  position:sticky;top:0;z-index:200;
+  background:var(--ink);
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 1.75rem;height:60px;
+  box-shadow:0 2px 12px rgba(0,0,0,.35);
+}
+.brand{
+  font-family:'Syne',sans-serif;font-weight:800;font-size:1.1rem;
+  color:var(--paper);letter-spacing:-.03em;display:flex;align-items:center;gap:.5rem;
+}
+.brand-dot{color:var(--gold)}
+.nav-pills{display:flex;gap:.25rem}
+.npill{
+  font-family:'Syne',sans-serif;font-weight:700;font-size:.72rem;
+  letter-spacing:.08em;text-transform:uppercase;
+  color:#7a7668;background:none;border:none;
+  padding:.45rem 1rem;border-radius:6px;transition:all .18s;
+}
+.npill:hover{color:var(--paper);background:rgba(255,255,255,.08)}
+.npill.active{color:var(--ink);background:var(--paper)}
+.auth-chip{
+  font-size:.75rem;color:#7a7668;display:flex;align-items:center;gap:.5rem;
+}
+.auth-chip span{color:var(--gold);font-weight:600}
+.logout-btn{
+  background:rgba(255,255,255,.08);border:none;color:#9a9688;
+  font-size:.72rem;font-weight:600;padding:.3rem .7rem;border-radius:5px;
+  transition:all .15s;
+}
+.logout-btn:hover{background:rgba(255,255,255,.15);color:var(--paper)}
+
+/* ══════════════════════ VIEWS ══════════════════════ */
+.view{display:none}
+.view.active{display:block}
+
+/* ══════════════════════ HERO ══════════════════════ */
+.hero{
+  background:var(--ink);padding:3.5rem 2rem 3rem;text-align:center;
+  position:relative;overflow:hidden;
+}
+.hero::before,.hero::after{
+  content:'';position:absolute;border-radius:50%;pointer-events:none;
+}
+.hero::before{
+  width:320px;height:320px;top:-80px;right:-60px;
+  background:radial-gradient(circle,rgba(26,86,176,.22) 0%,transparent 65%);
+}
+.hero::after{
+  width:260px;height:260px;bottom:-80px;left:-40px;
+  background:radial-gradient(circle,rgba(176,58,26,.18) 0%,transparent 65%);
+}
+.hero-eyebrow{
+  font-family:'Syne',sans-serif;font-size:.68rem;font-weight:700;
+  letter-spacing:.2em;text-transform:uppercase;color:var(--gold);margin-bottom:.6rem;
+}
+.hero-title{
+  font-family:'Syne',sans-serif;font-size:clamp(2rem,5vw,3.2rem);
+  font-weight:800;color:var(--paper);line-height:1.05;letter-spacing:-.05em;
+  position:relative;z-index:1;
+}
+.hero-sub{color:#908c82;margin-top:.6rem;font-size:.9rem;position:relative;z-index:1}
+
+/* ══════════════════════ UPLOAD FORM ══════════════════════ */
+.form-wrap{max-width:720px;margin:2.5rem auto;padding:0 1.25rem 3rem}
+.card{
+  background:#fff;border-radius:18px;
+  box-shadow:var(--shadow);border:1.5px solid var(--border);
+  padding:2rem;
+}
+.flabel{
+  display:block;font-family:'Syne',sans-serif;font-weight:700;
+  font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--muted);margin-bottom:.45rem;
+}
+.fgroup{margin-bottom:1.4rem}
+.finput{
+  width:100%;padding:.7rem 1rem;border:1.5px solid var(--border);border-radius:10px;
+  font-family:'DM Sans',sans-serif;font-size:.95rem;background:var(--paper);
+  color:var(--ink);outline:none;transition:border-color .2s;
+}
+.finput:focus{border-color:var(--g1)}
+
+/* group selector */
+.gsel{display:grid;grid-template-columns:1fr 1fr;gap:.75rem}
+.gbtn{
+  padding:1.1rem .75rem;border-radius:12px;border:2px solid var(--border);
+  background:var(--paper);cursor:pointer;font-family:'Syne',sans-serif;
+  font-weight:700;font-size:1rem;color:var(--ink);transition:all .2s;text-align:center;
+}
+.gbtn:hover{border-color:var(--g1);transform:translateY(-2px)}
+.gbtn.active.g1{background:var(--g1);border-color:var(--g1);color:#fff}
+.gbtn.active.g2{background:var(--g2);border-color:var(--g2);color:#fff}
+.gbtn-sub{font-size:.68rem;font-weight:400;opacity:.75;margin-top:.2rem;display:block}
+
+/* dropzone */
+.dropzone{
+  border:2px dashed #ccc8be;border-radius:14px;padding:2.5rem 1.5rem;
+  text-align:center;cursor:pointer;background:var(--cream);transition:all .2s;
+}
+.dropzone:hover,.dropzone.over{border-color:var(--g1);background:#f0f5fc}
+.dz-icon{font-size:2.2rem;margin-bottom:.5rem}
+.dz-text{font-weight:500;color:var(--muted);font-size:.88rem}
+.dz-text strong{color:var(--g1)}
+.dz-hint{font-size:.73rem;color:#b0ab9e;margin-top:.3rem}
+#fileInput{display:none}
+
+/* file chips */
+.chip-list{display:flex;flex-direction:column;gap:.45rem;margin-top:.85rem}
+.chip{
+  display:flex;align-items:center;gap:.65rem;background:var(--paper);
+  border:1.5px solid var(--border);border-radius:9px;padding:.55rem .85rem;font-size:.86rem;
+}
+.chip-ico{font-size:1.1rem}
+.chip-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500}
+.chip-size{color:var(--muted);font-size:.75rem;white-space:nowrap}
+.chip-rm{background:none;border:none;color:var(--g2);font-size:1rem;opacity:.7;padding:0}
+.chip-rm:hover{opacity:1}
+
+/* submit */
+.submit-btn{
+  width:100%;padding:.9rem;background:var(--g1);color:#fff;border:none;
+  border-radius:11px;font-family:'Syne',sans-serif;font-weight:700;
+  font-size:.95rem;letter-spacing:.04em;transition:all .2s;margin-top:.25rem;
+  display:flex;align-items:center;justify-content:center;gap:.5rem;
+}
+.submit-btn:hover:not(:disabled){background:#1345a0;transform:translateY(-1px)}
+.submit-btn:disabled{background:#c8c4bc;cursor:not-allowed;transform:none}
+
+/* progress bar */
+.progress-wrap{margin-top:1rem;display:none}
+.progress-label{font-size:.78rem;color:var(--muted);margin-bottom:.35rem;font-weight:500}
+.progress-bar-bg{height:6px;background:var(--cream);border-radius:99px;overflow:hidden}
+.progress-bar-fill{height:100%;background:var(--g1);border-radius:99px;transition:width .3s;width:0%}
+
+/* banners */
+.banner{
+  border-radius:11px;padding:.9rem 1.1rem;margin-top:.9rem;
+  font-weight:500;text-align:center;font-size:.9rem;display:none;
+}
+.banner.success{background:#e6f5ee;border:1.5px solid #81c784;color:var(--success)}
+.banner.error  {background:#fde8e8;border:1.5px solid #e88;color:var(--danger)}
+
+/* ══════════════════════ ADMIN LOGIN ══════════════════════ */
+.login-wrap{
+  min-height:calc(100vh - 60px);display:flex;
+  align-items:center;justify-content:center;padding:2rem;
+}
+.login-card{
+  background:#fff;border-radius:18px;
+  box-shadow:var(--shadow-lg);border:1.5px solid var(--border);
+  padding:2.5rem 2rem;width:100%;max-width:400px;text-align:center;
+}
+.login-icon{font-size:2.5rem;margin-bottom:.75rem}
+.login-title{
+  font-family:'Syne',sans-serif;font-weight:800;font-size:1.5rem;
+  letter-spacing:-.04em;margin-bottom:.3rem;
+}
+.login-sub{color:var(--muted);font-size:.88rem;margin-bottom:1.75rem}
+.login-field{
+  width:100%;padding:.75rem 1rem;border:1.5px solid var(--border);
+  border-radius:10px;font-family:'DM Sans',sans-serif;font-size:.95rem;
+  background:var(--paper);color:var(--ink);outline:none;
+  transition:border-color .2s;margin-bottom:.75rem;
+}
+.login-field:focus{border-color:var(--g1)}
+.login-btn{
+  width:100%;padding:.85rem;background:var(--ink);color:#fff;border:none;
+  border-radius:10px;font-family:'Syne',sans-serif;font-weight:700;font-size:.9rem;
+  transition:all .2s;display:flex;align-items:center;justify-content:center;gap:.5rem;
+}
+.login-btn:hover{background:#2a2a28}
+.login-err{
+  background:#fde8e8;border:1.5px solid #e88;color:var(--danger);
+  border-radius:9px;padding:.65rem 1rem;font-size:.84rem;font-weight:500;
+  margin-bottom:.75rem;display:none;
+}
+
+/* ══════════════════════ ADMIN SHELL ══════════════════════ */
+.admin-shell{display:flex;min-height:calc(100vh - 60px)}
+
+/* sidebar */
+.sidebar{
+  width:270px;min-width:240px;background:var(--ink);
+  padding:1.25rem .85rem;flex-shrink:0;overflow-y:auto;
+}
+.sb-title{
+  font-family:'Syne',sans-serif;font-size:.65rem;font-weight:700;
+  letter-spacing:.16em;text-transform:uppercase;color:#5a5650;
+  padding:0 .5rem;margin-bottom:1rem;
+}
+.grp-header{
+  display:flex;align-items:center;gap:.5rem;
+  padding:.5rem .65rem;border-radius:8px;cursor:pointer;
+  font-family:'Syne',sans-serif;font-weight:700;font-size:.82rem;
+  color:var(--paper);transition:background .15s;user-select:none;
+}
+.grp-header:hover,.grp-header.open{background:rgba(255,255,255,.09)}
+.grp-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.g1d{background:var(--g1)} .g2d{background:var(--g2)}
+.grp-cnt{margin-left:auto;margin-right:.3rem;font-size:.68rem;color:#6b8fd4}
+.g2-cnt{color:#d47a6b}
+.grp-arr{font-size:.65rem;transition:transform .2s}
+.grp-header.open .grp-arr{transform:rotate(90deg)}
+.stu-list{display:none;padding:.2rem 0 .5rem 1.2rem;flex-direction:column;gap:.1rem}
+.stu-list.open{display:flex}
+.stu-item{
+  padding:.4rem .65rem;border-radius:7px;cursor:pointer;
+  font-size:.82rem;color:#908c82;transition:all .15s;
+  display:flex;align-items:center;gap:.45rem;
+}
+.stu-item:hover{background:rgba(255,255,255,.06);color:var(--paper)}
+.stu-item.sel{background:rgba(255,255,255,.12);color:var(--paper)}
+.stu-fc{
+  margin-left:auto;background:rgba(255,255,255,.1);
+  color:var(--gold);font-size:.66rem;font-weight:700;
+  padding:.1rem .4rem;border-radius:99px;
+}
+.sb-empty{padding:.45rem .65rem;font-size:.76rem;color:#4a4840;font-style:italic}
+
+/* main */
+.adm-main{flex:1;padding:2rem;overflow-y:auto;background:var(--paper)}
+
+/* stats */
+.stats{display:flex;gap:.75rem;flex-wrap:wrap;margin-bottom:1.75rem}
+.stat{
+  background:#fff;border:1.5px solid var(--border);border-radius:10px;
+  padding:.5rem .9rem;font-size:.8rem;display:flex;align-items:center;gap:.5rem;
+  box-shadow:0 1px 6px rgba(17,18,16,.05);
+}
+.stat strong{font-family:'Syne',sans-serif;font-size:.95rem}
+
+/* placeholder */
+.placeholder{
+  height:100%;min-height:300px;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;text-align:center;gap:.65rem;
+  color:var(--muted);padding:3rem;
+}
+.ph-ico{font-size:3rem;opacity:.35}
+.ph-txt{font-size:.95rem;font-weight:500}
+.ph-sub{font-size:.82rem;opacity:.65}
+
+/* panel */
+.stu-panel{display:none}
+.panel-head{
+  display:flex;align-items:flex-start;gap:1rem;
+  margin-bottom:1.5rem;padding-bottom:1.25rem;border-bottom:1.5px solid var(--border);
+}
+.panel-av{
+  width:50px;height:50px;border-radius:13px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Syne',sans-serif;font-weight:800;font-size:1.2rem;color:#fff;
+}
+.panel-name{
+  font-family:'Syne',sans-serif;font-weight:800;font-size:1.35rem;letter-spacing:-.04em;
+}
+.panel-meta{font-size:.8rem;color:var(--muted);margin-top:.25rem;display:flex;align-items:center;gap:.5rem}
+.grp-badge{
+  font-family:'Syne',sans-serif;font-size:.65rem;font-weight:700;
+  letter-spacing:.08em;text-transform:uppercase;padding:.18rem .55rem;
+  border-radius:99px;color:#fff;
+}
+
+/* files grid */
+.files-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:1rem}
+.fcard{
+  background:#fff;border:1.5px solid var(--border);border-radius:13px;
+  overflow:hidden;box-shadow:var(--shadow);cursor:pointer;transition:all .2s;
+}
+.fcard:hover{transform:translateY(-3px);box-shadow:var(--shadow-lg);border-color:#c8c4ba}
+.fthumb{
+  height:138px;background:var(--cream);
+  display:flex;align-items:center;justify-content:center;overflow:hidden;
+}
+.fthumb img{width:100%;height:100%;object-fit:cover}
+.fthumb-pdf{flex-direction:column;gap:.35rem}
+.pdf-ico{font-size:2.4rem}
+.pdf-lbl{
+  font-family:'Syne',sans-serif;font-weight:700;font-size:.68rem;
+  letter-spacing:.1em;color:var(--g2);text-transform:uppercase;
+}
+.finfo{padding:.7rem .85rem;border-top:1px solid var(--border)}
+.finfo-name{font-weight:600;font-size:.8rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.finfo-date{font-size:.7rem;color:var(--muted);margin-top:.15rem}
+.no-files{text-align:center;padding:2.5rem;color:var(--muted);font-size:.88rem}
+
+/* spinner */
+.spinner{
+  display:inline-block;width:18px;height:18px;border:2px solid rgba(255,255,255,.3);
+  border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* loading overlay */
+.loading-overlay{
+  display:none;position:fixed;inset:0;background:rgba(17,18,16,.5);
+  z-index:500;align-items:center;justify-content:center;flex-direction:column;gap:1rem;
+}
+.loading-overlay.show{display:flex}
+.loading-box{
+  background:#fff;border-radius:14px;padding:2rem 2.5rem;
+  text-align:center;box-shadow:var(--shadow-lg);
+}
+.loading-txt{margin-top:.75rem;font-weight:600;font-size:.9rem;color:var(--muted)}
+
+/* ══════════════════════ MODAL ══════════════════════ */
+.modal-ov{
+  display:none;position:fixed;inset:0;background:rgba(17,18,16,.8);
+  z-index:900;align-items:center;justify-content:center;padding:1.5rem;
+}
+.modal-ov.open{display:flex}
+.modal-box{
+  background:var(--paper);border-radius:18px;max-width:880px;width:100%;
+  max-height:92vh;overflow:hidden;display:flex;flex-direction:column;
+  box-shadow:0 24px 80px rgba(17,18,16,.45);
+}
+.modal-top{
+  display:flex;align-items:center;padding:.9rem 1.2rem;
+  border-bottom:1.5px solid var(--border);gap:.75rem;
+}
+.modal-tit{
+  font-family:'Syne',sans-serif;font-weight:700;font-size:.88rem;
+  flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.modal-close{
+  background:var(--cream);border:none;border-radius:7px;
+  width:30px;height:30px;font-size:.95rem;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;transition:background .15s;
+}
+.modal-close:hover{background:var(--border)}
+.modal-body{
+  flex:1;overflow:hidden;display:flex;align-items:center;
+  justify-content:center;padding:1rem;background:#1a1a1a;
+}
+.modal-body img{max-width:100%;max-height:78vh;object-fit:contain;border-radius:7px}
+.modal-body iframe{width:100%;height:78vh;border:none;border-radius:7px}
+
+/* ══════════════════════ RESPONSIVE ══════════════════════ */
+@media(max-width:700px){
+  .admin-shell{flex-direction:column}
+  .sidebar{width:100%;min-width:unset}
+  .stu-list{padding-left:.8rem}
+  .files-grid{grid-template-columns:repeat(auto-fill,minmax(145px,1fr))}
+  .gsel{grid-template-columns:1fr 1fr}
+  .topnav{padding:0 1rem}
+}
+</style>
+</head>
+<body>
+
+<!-- ══ TOP NAV ══ -->
+<nav class="topnav">
+  <div class="brand">📚 Compendio<span class="brand-dot">·</span>Escolar</div>
+  <div class="nav-pills">
+    <button class="npill active" onclick="switchView('student',this)">Alumnos</button>
+    <button class="npill" onclick="switchView('admin',this)">Administración</button>
+  </div>
+  <div class="auth-chip" id="authChip" style="display:none">
+    <span id="authEmail"></span>
+    <button class="logout-btn" onclick="doLogout()">Salir</button>
+  </div>
+</nav>
+
+<!-- ══════════════════════ STUDENT VIEW ══════════════════════ -->
+<div id="view-student" class="view active">
+  <div class="hero">
+    <div class="hero-eyebrow">Sistema de Entrega</div>
+    <h1 class="hero-title">Sube tu<br>Compendio</h1>
+    <p class="hero-sub">Entrega tu evidencia en PDF o imagen</p>
+  </div>
+
+  <div class="form-wrap">
+    <div class="card">
+
+      <div class="fgroup">
+        <label class="flabel">Selecciona tu grupo</label>
+        <div class="gsel">
+          <button class="gbtn g1" onclick="pickGroup('Segundo I',this)">
+            Segundo I<span class="gbtn-sub">Grupo A</span>
+          </button>
+          <button class="gbtn g2" onclick="pickGroup('Segundo II',this)">
+            Segundo II<span class="gbtn-sub">Grupo B</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="fgroup">
+        <label class="flabel" for="stuName">Nombre completo</label>
+        <input class="finput" type="text" id="stuName" placeholder="Ej. María García López" oninput="checkForm()"/>
+      </div>
+
+      <div class="fgroup">
+        <label class="flabel">Archivos de evidencia</label>
+        <div class="dropzone" id="dz" onclick="document.getElementById('fileInput').click()">
+          <div class="dz-icon">📎</div>
+          <div class="dz-text"><strong>Haz clic</strong> o arrastra tus archivos aquí</div>
+          <div class="dz-hint">PDF, JPG, PNG — Máx. 15 MB por archivo</div>
+        </div>
+        <input type="file" id="fileInput" multiple accept=".pdf,.jpg,.jpeg,.png" onchange="handleFiles(this.files)"/>
+        <div class="chip-list" id="chipList"></div>
+      </div>
+
+      <div class="progress-wrap" id="progressWrap">
+        <div class="progress-label" id="progressLabel">Subiendo archivos…</div>
+        <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressFill"></div></div>
+      </div>
+
+      <button class="submit-btn" id="submitBtn" onclick="submitEvidence()" disabled>
+        Enviar evidencia →
+      </button>
+      <div class="banner success" id="okBanner">✅ ¡Evidencia entregada con éxito!</div>
+      <div class="banner error"   id="errBanner"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════ ADMIN VIEW ══════════════════════ -->
+<div id="view-admin" class="view">
+
+  <!-- Login -->
+  <div class="login-wrap" id="loginWrap">
+    <div class="login-card">
+      <div class="login-icon">🔐</div>
+      <h2 class="login-title">Acceso Docente</h2>
+      <p class="login-sub">Ingresa con tu cuenta de administrador</p>
+      <div class="login-err" id="loginErr"></div>
+      <input class="login-field" type="email" id="loginEmail" placeholder="correo@ejemplo.com" onkeydown="if(event.key==='Enter')doLogin()"/>
+      <input class="login-field" type="password" id="loginPass" placeholder="Contraseña" onkeydown="if(event.key==='Enter')doLogin()"/>
+      <button class="login-btn" onclick="doLogin()" id="loginBtn">
+        Entrar
+      </button>
+    </div>
+  </div>
+
+  <!-- Admin shell (hidden until logged in) -->
+  <div class="admin-shell" id="adminShell" style="display:none">
+    <aside class="sidebar">
+      <div class="sb-title">Grupos & Alumnos</div>
+
+      <div style="margin-bottom:.75rem">
+        <div class="grp-header" onclick="toggleGrp('g1list',this)">
+          <span class="grp-dot g1d"></span>Segundo I
+          <span class="grp-cnt" id="g1cnt"></span>
+          <span class="grp-arr">▶</span>
+        </div>
+        <div class="stu-list" id="g1list"></div>
+      </div>
+
+      <div>
+        <div class="grp-header" onclick="toggleGrp('g2list',this)">
+          <span class="grp-dot g2d"></span>Segundo II
+          <span class="grp-cnt g2-cnt" id="g2cnt"></span>
+          <span class="grp-arr">▶</span>
+        </div>
+        <div class="stu-list" id="g2list"></div>
+      </div>
+    </aside>
+
+    <main class="adm-main">
+      <div class="stats" id="statsBar"></div>
+      <div class="placeholder" id="adminPh">
+        <div class="ph-ico">🗂️</div>
+        <div class="ph-txt">Selecciona un alumno</div>
+        <div class="ph-sub">Elige grupo y alumno en el panel izquierdo</div>
+      </div>
+      <div class="stu-panel" id="stuPanel">
+        <div class="panel-head">
+          <div class="panel-av" id="panelAv"></div>
+          <div>
+            <div class="panel-name" id="panelName"></div>
+            <div class="panel-meta">
+              <span class="grp-badge" id="panelBadge"></span>
+              <span id="panelFc"></span>
+            </div>
+          </div>
+        </div>
+        <div class="files-grid" id="filesGrid"></div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- ══ MODAL ══ -->
+<div class="modal-ov" id="modalOv" onclick="if(event.target===this)closeModal()">
+  <div class="modal-box">
+    <div class="modal-top">
+      <div class="modal-tit" id="modalTit"></div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<!-- ══ LOADING ══ -->
+<div class="loading-overlay" id="loadingOv">
+  <div class="loading-box">
+    <div class="spinner" style="width:36px;height:36px;border-width:3px;border-top-color:var(--g1);border-color:var(--border)"></div>
+    <div class="loading-txt" id="loadingTxt">Cargando…</div>
+  </div>
+</div>
+
+<script>
+/* ══════════════ STATE ══════════════ */
+const S = {
+  group: null,
+  files: [],       // {file, dataUrl}
+  adminUser: null,
+  submissions: [], // loaded from Firestore
+  currentFiles: [] // files for modal
+};
+
+/* ══════════════ NAV ══════════════ */
+function switchView(v, btn) {
+  document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.npill').forEach(el => el.classList.remove('active'));
+  document.getElementById('view-' + v).classList.add('active');
+  if (btn) btn.classList.add('active');
+  if (v === 'admin') initAdmin();
+}
+
+/* ══════════════ AUTH ══════════════ */
+window._onAuthChange = user => {
+  S.adminUser = user;
+  const chip = document.getElementById('authChip');
+  if (user) {
+    chip.style.display = 'flex';
+    document.getElementById('authEmail').textContent = user.email;
+    document.getElementById('loginWrap').style.display = 'none';
+    document.getElementById('adminShell').style.display = 'flex';
+    loadAdminData();
+  } else {
+    chip.style.display = 'none';
+    document.getElementById('loginWrap').style.display = 'flex';
+    document.getElementById('adminShell').style.display = 'none';
+  }
+};
+
+async function doLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const pass  = document.getElementById('loginPass').value;
+  const errEl = document.getElementById('loginErr');
+  const btn   = document.getElementById('loginBtn');
+  errEl.style.display = 'none';
+  btn.innerHTML = '<div class="spinner"></div>';
+  btn.disabled = true;
+  try {
+    const { auth, signInWithEmailAndPassword } = window._fb;
+    await signInWithEmailAndPassword(auth, email, pass);
+  } catch(e) {
+    errEl.textContent = 'Credenciales incorrectas. Verifica tu correo y contraseña.';
+    errEl.style.display = 'block';
+    btn.innerHTML = 'Entrar';
+    btn.disabled = false;
+  }
+}
+
+async function doLogout() {
+  const { auth, signOut } = window._fb;
+  await signOut(auth);
+}
+
+function initAdmin() {
+  if (S.adminUser) {
+    document.getElementById('loginWrap').style.display = 'none';
+    document.getElementById('adminShell').style.display = 'flex';
+    loadAdminData();
+  }
+}
+
+/* ══════════════ STUDENT FORM ══════════════ */
+function pickGroup(name, btn) {
+  S.group = name;
+  document.querySelectorAll('.gbtn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  checkForm();
+}
+
+// Dropzone drag
+const dz = document.getElementById('dz');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('over'));
+dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('over'); handleFiles(e.dataTransfer.files); });
+
+function handleFiles(files) {
+  Array.from(files).forEach(f => {
+    const ok = ['application/pdf','image/jpeg','image/png','image/jpg'].includes(f.type);
+    if (!ok) return;
+    if (f.size > 15 * 1024 * 1024) { showErr('El archivo ' + f.name + ' supera 15 MB'); return; }
+    if (S.files.find(sf => sf.file.name === f.name)) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      S.files.push({ file: f, dataUrl: e.target.result });
+      renderChips();
+      checkForm();
+    };
+    reader.readAsDataURL(f);
+  });
+}
+
+function renderChips() {
+  document.getElementById('chipList').innerHTML = S.files.map((sf, i) => `
+    <div class="chip">
+      <span class="chip-ico">${sf.file.type==='application/pdf'?'📄':'🖼️'}</span>
+      <span class="chip-name">${sf.file.name}</span>
+      <span class="chip-size">${(sf.file.size/1024).toFixed(0)} KB</span>
+      <button class="chip-rm" onclick="rmFile(${i})">✕</button>
+    </div>`).join('');
+}
+
+function rmFile(i) { S.files.splice(i,1); renderChips(); checkForm(); }
+
+function checkForm() {
+  const name = document.getElementById('stuName').value.trim();
+  document.getElementById('submitBtn').disabled = !(S.group && name && S.files.length > 0);
+}
+
+/* ══════════════ SUBMIT ══════════════ */
+async function submitEvidence() {
+  const name  = document.getElementById('stuName').value.trim();
+  if (!S.group || !name || S.files.length === 0) return;
+
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div> Subiendo…';
+  document.getElementById('progressWrap').style.display = 'block';
+  document.getElementById('okBanner').style.display = 'none';
+  document.getElementById('errBanner').style.display = 'none';
+
+  const { db, storage, collection, addDoc, serverTimestamp, ref, uploadBytes, getDownloadURL } = window._fb;
+  const uploaded = [];
+
+  try {
+    for (let i = 0; i < S.files.length; i++) {
+      const sf = S.files[i];
+      const pct = Math.round((i / S.files.length) * 80);
+      setProgress(pct, `Subiendo ${i+1} de ${S.files.length}: ${sf.file.name}`);
+
+      const path = `evidencias/${S.group}/${name}/${Date.now()}_${sf.file.name}`;
+      const storageRef = ref(storage, path);
+      await uploadBytes(storageRef, sf.file);
+      const url = await getDownloadURL(storageRef);
+      uploaded.push({ name: sf.file.name, type: sf.file.type, size: sf.file.size, url, path });
+    }
+
+    setProgress(90, 'Guardando registro…');
+    await addDoc(collection(db, 'submissions'), {
+      group: S.group,
+      name,
+      files: uploaded,
+      createdAt: serverTimestamp()
+    });
+
+    setProgress(100, '¡Listo!');
+    setTimeout(() => {
+      document.getElementById('progressWrap').style.display = 'none';
+      document.getElementById('okBanner').style.display = 'block';
+      setTimeout(() => document.getElementById('okBanner').style.display = 'none', 5000);
+    }, 600);
+
+    // Reset
+    S.files = []; S.group = null;
+    document.getElementById('stuName').value = '';
+    document.getElementById('chipList').innerHTML = '';
+    document.querySelectorAll('.gbtn').forEach(b => b.classList.remove('active'));
+    btn.innerHTML = 'Enviar evidencia →';
+    checkForm();
+
+  } catch(e) {
+    showErr('Error al subir: ' + e.message);
+    btn.innerHTML = 'Enviar evidencia →';
+    btn.disabled = false;
+    document.getElementById('progressWrap').style.display = 'none';
+  }
+}
+
+function setProgress(pct, label) {
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressLabel').textContent = label;
+}
+
+function showErr(msg) {
+  const el = document.getElementById('errBanner');
+  el.textContent = '⚠️ ' + msg;
+  el.style.display = 'block';
+}
+
+/* ══════════════ ADMIN DATA ══════════════ */
+async function loadAdminData() {
+  showLoading('Cargando entregas…');
+  const { db, collection, getDocs, query, orderBy } = window._fb;
+  try {
+    const q = query(collection(db, 'submissions'), orderBy('createdAt', 'desc'));
+    const snap = await getDocs(q);
+    S.submissions = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    buildSidebar();
+    buildStats();
+  } catch(e) {
+    console.error(e);
+  }
+  hideLoading();
+}
+
+function buildStats() {
+  const total = S.submissions.length;
+  const g1 = S.submissions.filter(s => s.group === 'Segundo I').length;
+  const g2 = S.submissions.filter(s => s.group === 'Segundo II').length;
+  const totalF = S.submissions.reduce((a, s) => a + (s.files||[]).length, 0);
+  document.getElementById('statsBar').innerHTML = `
+    <div class="stat">📥 <strong>${total}</strong> entregas</div>
+    <div class="stat" style="border-color:#6b8fd4"><span style="color:var(--g1)">●</span> <strong>${g1}</strong> Segundo I</div>
+    <div class="stat" style="border-color:#d47a6b"><span style="color:var(--g2)">●</span> <strong>${g2}</strong> Segundo II</div>
+    <div class="stat">📎 <strong>${totalF}</strong> archivos</div>`;
+}
+
+function buildSidebar() {
+  ['Segundo I','Segundo II'].forEach((g, gi) => {
+    const listId = gi === 0 ? 'g1list' : 'g2list';
+    const cntId  = gi === 0 ? 'g1cnt'  : 'g2cnt';
+    const students = {};
+    S.submissions.filter(s => s.group === g).forEach(s => {
+      if (!students[s.name]) students[s.name] = [];
+      (s.files||[]).forEach(f => students[s.name].push(f));
+    });
+    const names = Object.keys(students);
+    document.getElementById(cntId).textContent = names.length ? `${names.length} alumnos` : '';
+    const listEl = document.getElementById(listId);
+    if (!names.length) {
+      listEl.innerHTML = '<div class="sb-empty">Sin entregas aún</div>';
+    } else {
+      listEl.innerHTML = names.map(n => `
+        <div class="stu-item" onclick="showStudent('${g}','${escQ(n)}')" id="si_${slugify(g)}_${slugify(n)}">
+          <span>👤</span>
+          <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${n}</span>
+          <span class="stu-fc">${students[n].length}</span>
+        </div>`).join('');
+    }
+  });
+}
+
+function toggleGrp(id, header) {
+  document.getElementById(id).classList.toggle('open');
+  header.classList.toggle('open');
+}
+
+function showStudent(group, name) {
+  document.querySelectorAll('.stu-item').forEach(el => el.classList.remove('sel'));
+  const el = document.getElementById(`si_${slugify(group)}_${slugify(name)}`);
+  if (el) el.classList.add('sel');
+
+  const allFiles = [];
+  S.submissions.filter(s => s.group === group && s.name === name)
+    .forEach(s => (s.files||[]).forEach(f => allFiles.push(f)));
+
+  document.getElementById('adminPh').style.display = 'none';
+  const panel = document.getElementById('stuPanel');
+  panel.style.display = 'block';
+
+  const color = group === 'Segundo I' ? 'var(--g1)' : 'var(--g2)';
+  const initials = name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  document.getElementById('panelAv').style.background = color;
+  document.getElementById('panelAv').textContent = initials;
+  document.getElementById('panelName').textContent = name;
+  document.getElementById('panelBadge').style.background = color;
+  document.getElementById('panelBadge').textContent = group;
+  document.getElementById('panelFc').textContent =
+    `${allFiles.length} archivo${allFiles.length!==1?'s':''} entregado${allFiles.length!==1?'s':''}`;
+
+  S.currentFiles = allFiles;
+  const grid = document.getElementById('filesGrid');
+  if (!allFiles.length) {
+    grid.innerHTML = '<div class="no-files">Sin archivos para este alumno.</div>';
+    return;
+  }
+  grid.innerHTML = allFiles.map((f,i) => {
+    const isPdf = f.type === 'application/pdf';
+    const thumb = isPdf
+      ? `<div class="fthumb fthumb-pdf"><div class="pdf-ico">📄</div><div class="pdf-lbl">PDF</div></div>`
+      : `<div class="fthumb"><img src="${f.url}" alt="${f.name}" loading="lazy"/></div>`;
+    return `<div class="fcard" onclick="previewFile(${i})">${thumb}
+      <div class="finfo">
+        <div class="finfo-name">${f.name}</div>
+        <div class="finfo-date">${(f.size/1024).toFixed(0)} KB</div>
+      </div></div>`;
+  }).join('');
+}
+
+function previewFile(idx) {
+  const f = S.currentFiles[idx];
+  document.getElementById('modalTit').textContent = f.name;
+  const body = document.getElementById('modalBody');
+  body.innerHTML = f.type === 'application/pdf'
+    ? `<iframe src="${f.url}" title="${f.name}"></iframe>`
+    : `<img src="${f.url}" alt="${f.name}"/>`;
+  document.getElementById('modalOv').classList.add('open');
+}
+function closeModal() {
+  document.getElementById('modalOv').classList.remove('open');
+  document.getElementById('modalBody').innerHTML = '';
+}
+
+/* ══════════════ HELPERS ══════════════ */
+function slugify(s) { return (s||'').replace(/[^a-zA-ZáéíóúÁÉÍÓÚüÜñÑ0-9]/g,'_'); }
+function escQ(s)    { return (s||'').replace(/'/g,"\\'"); }
+
+function showLoading(txt='Cargando…') {
+  document.getElementById('loadingTxt').textContent = txt;
+  document.getElementById('loadingOv').classList.add('show');
+}
+function hideLoading() { document.getElementById('loadingOv').classList.remove('show'); }
+</script>
+</body>
+</html>
